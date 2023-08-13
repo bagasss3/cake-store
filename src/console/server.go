@@ -37,6 +37,9 @@ func server(cmd *cobra.Command, args []string) {
 	db := database.NewDB()
 	defer db.Close()
 
+	redisConn := database.NewRedisConn(config.RedisHost())
+	defer redisConn.Close()
+
 	// Create Echo instance
 	httpServer := echo.New()
 	httpServer.Use(middleware.Logger())
@@ -44,7 +47,7 @@ func server(cmd *cobra.Command, args []string) {
 	httpServer.Use(middleware.CORS())
 
 	// Depedency Injection
-	cakeRepository := repository.NewCakeRepository(db)
+	cakeRepository := repository.NewCakeRepository(db, redisConn)
 	cakeService := service.NewCakeService(cakeRepository)
 	cakeController := controller.NewCakeController(cakeService)
 

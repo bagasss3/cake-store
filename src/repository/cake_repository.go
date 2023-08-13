@@ -1,20 +1,26 @@
 package repository
 
 import (
+	"cake-store/src/config"
 	"cake-store/src/model"
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 )
 
 type cakeRepository struct {
-	db *sql.DB
+	db    *sql.DB
+	redis *redis.Client
 }
 
-func NewCakeRepository(db *sql.DB) model.CakeRepository {
+func NewCakeRepository(db *sql.DB, redis *redis.Client) model.CakeRepository {
 	return &cakeRepository{
-		db: db,
+		db:    db,
+		redis: redis,
 	}
 }
 
@@ -47,9 +53,15 @@ func (c *cakeRepository) Update(ctx context.Context, cake *model.Cake) error {
 		"cake":    cake,
 	})
 
-	query := `UPDATE cakes SET title = ?, description = ?, rating = ?, Image = ?, updated_at = ? WHERE id = ?;
-    `
+	query := "UPDATE cakes SET title = ?, description = ?, rating = ?, Image = ?, updated_at = ? WHERE id = ?"
+
 	_, err := c.db.ExecContext(ctx, query, cake.Title, cake.Description, cake.Rating, cake.Image, cake.UpdatedAt, cake.Id)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	err = c.redis.Del(ctx, fmt.Sprintf("cake:%d", cake.Id)).Err()
 	if err != nil {
 		log.Error(err)
 		return err
@@ -64,9 +76,15 @@ func (c *cakeRepository) Delete(ctx context.Context, cake *model.Cake) error {
 		"cake":    cake,
 	})
 
-	query := `UPDATE cakes SET deleted_at = ? where id = ?;
-    `
+	query := "UPDATE cakes SET deleted_at = ? where id = ?"
+
 	_, err := c.db.ExecContext(ctx, query, cake.DeletedAt, cake.Id)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	err = c.redis.Del(ctx, fmt.Sprintf("cake:%d", cake.Id)).Err()
 	if err != nil {
 		log.Error(err)
 		return err
@@ -108,6 +126,23 @@ func (c *cakeRepository) FindById(ctx context.Context, id int) (*model.Cake, err
 		"id":      id,
 	})
 
+	cache, err := c.redis.Get(ctx, fmt.Sprintf("cake:%d", id)).Result()
+	if err != nil && err != redis.Nil {
+		log.Error(err)
+		return nil, err
+	}
+
+	if err != redis.Nil {
+		log.Info("Fetch from redis")
+		var cake *model.Cake
+		if err := json.Unmarshal([]byte(cache), &cake); err != nil {
+			log.Error(err)
+			return nil, err
+		}
+
+		return cake, nil
+	}
+
 	sql := "SELECT * FROM cakes where id = ? AND deleted_at is null"
 	rows, err := c.db.QueryContext(ctx, sql, id)
 	if err != nil {
@@ -123,6 +158,20 @@ func (c *cakeRepository) FindById(ctx context.Context, id int) (*model.Cake, err
 			log.Error(err)
 			return nil, err
 		}
+
+		jsonData, err := json.Marshal(cake)
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
+
+		log.Info("Set data to redis")
+		err = c.redis.Set(context.Background(), fmt.Sprintf("cake:%d", id), string(jsonData), config.RedisExp()).Err()
+		if err != nil {
+			log.Error(err)
+			return nil, err
+		}
+
 		return cake, nil
 	}
 	return nil, nil

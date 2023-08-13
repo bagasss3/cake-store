@@ -1,7 +1,6 @@
 package console
 
 import (
-	"cake-store/src/config"
 	"cake-store/src/database"
 
 	"github.com/pressly/goose/v3"
@@ -31,9 +30,6 @@ func migration(cmd *cobra.Command, args []string) {
 	}
 	goose.SetTableName("schema_migrations")
 	sql := database.NewDB()
-	if err != nil {
-		log.WithField("DatabaseDSN", config.DBDSN()).Fatal("Failed to connect database: ", err)
-	}
 	defer sql.Close()
 
 	var dir string = "./database/migration"
