@@ -1,10 +1,13 @@
 port: "8080"
 database:
-  host: "localhost:3306"
+  host: "db:3306"
   database: "cakestore"
-  username: "user"
-  password: "password"
+  username: "cakeuser"
+  password: "test"
   maxIdleConns: 5
   maxOpenConns: 20
   connMaxLifeTime: "1h"
   connMaxIdleTime: "15m"
+redis:
+  host: "redis:6379"
+  exp: "5m"

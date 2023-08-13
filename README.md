@@ -1,6 +1,6 @@
 # Cake Store
 
-CRUD API for your favorite cakes
+A CRUD API project for your favorite cakes. Using redis + docker
 
 ## How to start
 
@@ -26,13 +26,25 @@ docker exec -it godockerDB mysql -u root -p
 CREATE DATABASE cakestore
 ```
 
-4. Migrate the sql script from local code
+4. Migrate the sql script from local project - change config.yml
+
+```bash
+database:
+  host: "db:3306"
+
+//to
+
+database:
+  host: "localhost:3306"
+```
+
+5. Migrate the sql script from local project - run migrate cmd
 
 ```bash
 go run main.go migrate --direction=up
 ```
 
-5. The API should be ready to use!
+6. The APIs should be ready to use!
 
 ## Command Usage
 

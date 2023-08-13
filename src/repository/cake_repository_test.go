@@ -4,6 +4,7 @@ import (
 	"cake-store/src/model"
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -179,16 +180,6 @@ func TestCakeRepository_FindAll(t *testing.T) {
 }
 
 func TestCakeRepository_FindByID(t *testing.T) {
-	kit, closer := initializeRepoTestKit(t)
-	defer closer()
-	mock := kit.dbmock
-
-	repo := cakeRepository{
-		db: kit.db,
-	}
-
-	ctx := context.TODO()
-
 	cake := &model.Cake{
 		Id:          1,
 		Title:       "Kue Test",
@@ -201,6 +192,16 @@ func TestCakeRepository_FindByID(t *testing.T) {
 	}
 
 	t.Run("ok - retrieve from db", func(t *testing.T) {
+		kit, closer := initializeRepoTestKit(t)
+		defer closer()
+		mock := kit.dbmock
+
+		repo := cakeRepository{
+			db:    kit.db,
+			redis: kit.redis,
+		}
+
+		ctx := context.TODO()
 		resRows := sqlmock.NewRows([]string{"id", "title", "description", "rating", "image", "created_at", "updated_at", "deleted_at"}).
 			AddRow(cake.Id, cake.Title, cake.Description, cake.Rating, cake.Image, cake.CreatedAt, cake.UpdatedAt, cake.DeletedAt)
 		mock.ExpectQuery("SELECT \\* FROM cakes").
@@ -210,9 +211,44 @@ func TestCakeRepository_FindByID(t *testing.T) {
 		res, err := repo.FindById(ctx, cake.Id)
 		require.NoError(t, err)
 		require.NotNil(t, res)
+
+		cache := kit.miniredis.Exists(fmt.Sprintf("cake:%d", cake.Id))
+		require.True(t, cache)
 	})
 
-	t.Run("not found", func(t *testing.T) {
+	t.Run("not found from db", func(t *testing.T) {
+		kit, closer := initializeRepoTestKit(t)
+		defer closer()
+		mock := kit.dbmock
+
+		repo := cakeRepository{
+			db:    kit.db,
+			redis: kit.redis,
+		}
+
+		ctx := context.TODO()
+		resRows := sqlmock.NewRows([]string{"id", "title", "description", "rating", "image", "created_at", "updated_at", "deleted_at"})
+		mock.ExpectQuery("SELECT \\* FROM cakes").
+			WithArgs(cake.Id).
+			WillReturnRows(resRows)
+
+		res, err := repo.FindById(ctx, cake.Id)
+		fmt.Println(res)
+		require.NoError(t, err)
+		require.Nil(t, res)
+	})
+
+	t.Run("not found from cache and db", func(t *testing.T) {
+		kit, closer := initializeRepoTestKit(t)
+		defer closer()
+		mock := kit.dbmock
+
+		repo := cakeRepository{
+			db:    kit.db,
+			redis: kit.redis,
+		}
+
+		ctx := context.TODO()
 		resRows := sqlmock.NewRows([]string{"id", "title", "description", "rating", "image", "created_at", "updated_at", "deleted_at"})
 		mock.ExpectQuery("SELECT \\* FROM cakes").
 			WithArgs(cake.Id).
@@ -221,9 +257,23 @@ func TestCakeRepository_FindByID(t *testing.T) {
 		res, err := repo.FindById(ctx, cake.Id)
 		require.NoError(t, err)
 		require.Nil(t, res)
+
+		cache, err := kit.miniredis.Get(fmt.Sprintf("cake:%d", cake.Id))
+		require.Error(t, err)
+		require.Equal(t, "", cache)
 	})
 
 	t.Run("err db", func(t *testing.T) {
+		kit, closer := initializeRepoTestKit(t)
+		defer closer()
+		mock := kit.dbmock
+
+		repo := cakeRepository{
+			db:    kit.db,
+			redis: kit.redis,
+		}
+
+		ctx := context.TODO()
 		mock.ExpectQuery("SELECT \\* FROM cakes").
 			WithArgs(cake.Id).
 			WillReturnError(errors.New("err db"))

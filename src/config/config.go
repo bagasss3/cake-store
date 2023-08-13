@@ -71,3 +71,12 @@ func ConnMaxIdleTime() time.Duration {
 	time := viper.GetString("database.connMaxIdleTime")
 	return helper.ParseTimeDuration(time, DefaultConnMaxIdleTime)
 }
+
+func RedisHost() string {
+	return viper.GetString("redis.host")
+}
+
+func RedisExp() time.Duration {
+	time := viper.GetString("redis.exp")
+	return helper.ParseTimeDuration(time, DefaultRedisExpiredDuration)
+}

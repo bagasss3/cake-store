@@ -1,29 +1,37 @@
 version: "3.8"
 
 services:
-  cake-store-go-service-1:
-    image: cake-store:1.0
+  cake-app:
+    image: cake:1.0
     ports:
       - "8080:8080"
     expose:
       - "8080"
     depends_on:
       - db
+      - redis
 
   db:
     image: mysql:latest
     restart: always
-    container_name: godockerDB
     environment:
       MYSQL_DATABASE: "cakestore"
-      MYSQL_USER: "user"
-      MYSQL_PASSWORD: "password"
-      MYSQL_ROOT_PASSWORD: "password"
+      MYSQL_USER: "cakeuser"
+      MYSQL_PASSWORD: "test"
+      MYSQL_ROOT_PASSWORD: "test"
     ports:
       - "3306:3306"
-    expose:
-      - "3306"
     volumes:
-      - my-db:/var/lib/mysql
+      - my-db-new:/var/lib/mysql
+
+  redis:
+    image: redis:5.0
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - "redis_db:/data"
 volumes:
-  my-db:
+  my-db-new:
+  redis_db:
